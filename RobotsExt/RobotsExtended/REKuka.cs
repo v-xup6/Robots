@@ -193,7 +193,6 @@ namespace RobotsExtended
     */
     public class KukaMergeKRL : GH_Component
     {
-        string prevApoCVEL = string.Empty;
         public KukaMergeKRL()
           : base("Merge KRL", "KRL",
               "Merges robots codes into a single KRL file",
@@ -219,8 +218,8 @@ namespace RobotsExtended
         {
             bool cvel = false;
             bool trigger = false;
+            string prevApoCVEL = string.Empty;
 
-            // Read user inputs
             DA.GetDataTree(0, out GH_Structure<GH_String> code);
             string name = string.Empty;
             DA.GetData(1, ref name);
@@ -228,7 +227,7 @@ namespace RobotsExtended
 
             List<string> header =
                 code.Branches[0][0].Value
-                .Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                .Split(new string[] { "\r\n","\r","\n",Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
             Dictionary<string, string> declare = new Dictionary<string, string>();
             List<string> prog = new List<string>();
             for (int i = 1; i < code.Branches[1].Count - 1; i++)// Skip RVP+REL and ENDDAT
@@ -255,8 +254,7 @@ namespace RobotsExtended
                 {
                     if (main[i].StartsWith(@"\b C_VEL"))
                     {
-                        string[] test = main[i].Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
-                        string apoCVEL = test[1];
+                        string apoCVEL = main[i].Split(';')[1];
                         if (main[i - 1].Substring(main[i - 1].Length - 5, 5) == "C_DIS")
                             main[i - 1] = main[i - 1].Replace("C_DIS", "C_VEL");
                         main.RemoveAt(i);
@@ -294,14 +292,12 @@ namespace RobotsExtended
                 }
             }
 
-            // Fool-proofin filename
             char[] arr = name.Where(c => (char.IsLetterOrDigit(c) || c == '_')).ToArray();
             StringBuilder nameFix = new StringBuilder();
             if (Char.IsDigit(arr[0])) nameFix.Append("KUKA_");
             nameFix.Append(arr);
             name = nameFix.ToString().Substring(0, Math.Min(nameFix.Length, 24));
 
-            // Merge KRL
             List<string> all = header.GetRange(0, 3);
             all[2] = "DEF " + name + "()";
             all.Add("\r\n;DAT DECL");
@@ -331,7 +327,7 @@ namespace RobotsExtended
         public override GH_Exposure Exposure => GH_Exposure.secondary;
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
-            pManager.AddIntegerParameter("Target Percentage", "%", "Speed % to maintain [0-100]", GH_ParamAccess.item);
+            pManager.AddIntegerParameter("Speed Percentage", "%", "Speed % to maintain [0-100]", GH_ParamAccess.item);
         }
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
@@ -344,7 +340,7 @@ namespace RobotsExtended
             percentage = Math.Max(percentage, 0);
             percentage = Math.Min(percentage, 100);
             string manufacturerText = "KUKA",
-                code = $"\\b C_VEL{Environment.NewLine}$APO.CVEL=Zonev{percentage}",
+                code = $"\\b C_VEL;$APO.CVEL=Zonev{percentage}",
                 declaration = $"DECL GLOBAL REAL Zonev{percentage} = {percentage}";
 
             var command = new Robots.Commands.Custom("Speed Aproximation");
